@@ -173,6 +173,7 @@ class Timesheet extends Page
                 ->action(function (array $data): void {
 
                     $date = Carbon::parse($this->currentDate)->setDay($this->selectedDay);
+                    $project = Project::with('milestones')->find($this->selectedProject);
 
                     TimeEntry::where('user_id', auth()->id())
                         ->where('project_id', $this->selectedProject)
@@ -181,17 +182,36 @@ class Timesheet extends Page
 
                     Log::info('Datos a crear:', $data);
 
+                    // Encontrar el hito correspondiente a la fecha
+                    $milestone = null;
+                    if ($project && $project->milestones->count() > 0) {
+                        $milestone = $project->milestones
+                            ->filter(function ($m) use ($date) {
+                                $startDate = Carbon::parse($m->start_date)->startOfDay();
+                                $endDate = Carbon::parse($m->end_date)->endOfDay();
+                                return $date->between($startDate, $endDate);
+                            })
+                            ->first();
+                    }
+
                     foreach ($data['phaseHours'] as $phase => $hours) {
                         $hours = floatval($hours);
 
                         if ($hours > 0) {
-                            TimeEntry::create([
+                            $entryData = [
                                 'user_id' => auth()->id(),
                                 'project_id' => $this->selectedProject,
                                 'date' => $date,
                                 'phase' => $phase,
                                 'hours' => $hours
-                            ]);
+                            ];
+
+                            // Si hay un hito correspondiente, asignar el ID del hito
+                            if ($milestone) {
+                                $entryData['milestone_id'] = $milestone->id;
+                            }
+
+                            TimeEntry::create($entryData);
                         }
                     }
 

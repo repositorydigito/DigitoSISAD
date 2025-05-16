@@ -21,6 +21,7 @@ class TimeEntryReport extends Model
     protected $fillable = [
         'user_id',
         'project_id',
+        'milestone_id',
         'date',
         'phase',
         'hours'
@@ -48,6 +49,11 @@ class TimeEntryReport extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function milestone(): BelongsTo
+    {
+        return $this->belongsTo(ProjectMilestone::class);
     }
 
 

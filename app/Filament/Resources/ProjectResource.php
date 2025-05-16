@@ -73,14 +73,28 @@ class ProjectResource extends Resource
                                         'ADENDA' => 'ADENDA',
                                         'FEE MENSUAL' => 'FEE MENSUAL',
                                     ])
-                                    ->placeholder('Seleccione una categoría'),
+                                    ->placeholder('Seleccione una categoría')
+                                    ->live()
+                                    ->afterStateUpdated(fn (Forms\Set $set) => $set('validity', null)),
+
+                                Forms\Components\Select::make('validity')
+                                    ->label('Vigencia')
+                                    ->options([
+                                        'Vigente' => 'Vigente',
+                                        'Sin Vigencia' => 'Sin Vigencia',
+                                    ])
+                                    ->placeholder('Seleccione la vigencia')
+                                    ->visible(fn (Forms\Get $get): bool => $get('category') === 'BOLSA DE HORAS')
+                                    ->required(fn (Forms\Get $get): bool => $get('category') === 'BOLSA DE HORAS')
+                                    ->helperText('Este campo solo aplica para proyectos de tipo BOLSA DE HORAS'),
 
                                 Forms\Components\Select::make('state')
                                     ->label('Estado')
                                     ->options([
                                         'En Curso' => 'En Curso',
                                         'Completado' => 'Completado',
-                                        'En Garantia' => 'En Garantia'
+                                        'En Garantia' => 'En Garantia',
+                                        'Bloqueado' => 'Bloqueado',
                                     ])
                                     ->placeholder('Seleccione un estado'),
 
@@ -104,30 +118,14 @@ class ProjectResource extends Resource
                         Forms\Components\Grid::make(2)
                             ->schema([
                                 Forms\Components\DatePicker::make('start_date')
-                                    ->label('Fecha de Inicio')
+                                    ->label('Fecha de Inicio Planificada (según cronograma)')
                                     ->required()
                                     ->native(false)
                                     ->displayFormat('d/m/Y')
                                     ->closeOnDateSelection(),
 
                                 Forms\Components\DatePicker::make('end_date')
-                                    ->label('Fecha de Finalización')
-                                    ->native(false)
-                                    ->displayFormat('d/m/Y')
-                                    ->closeOnDateSelection()
-                                    ->afterOrEqual('start_date')
-                                    ->rules(['after_or_equal:start_date']),
-
-                                Forms\Components\DatePicker::make('end_date_projected')
-                                    ->label('Fecha de Finalización Proyectada')
-                                    ->native(false)
-                                    ->displayFormat('d/m/Y')
-                                    ->closeOnDateSelection()
-                                    ->afterOrEqual('start_date')
-                                    ->rules(['after_or_equal:start_date']),
-
-                                Forms\Components\DatePicker::make('end_date_real')
-                                    ->label('Fecha de Finalización Real')
+                                    ->label('Fecha de Finalización Planificada (según cronograma)')
                                     ->native(false)
                                     ->displayFormat('d/m/Y')
                                     ->closeOnDateSelection()
@@ -135,19 +133,19 @@ class ProjectResource extends Resource
                                     ->rules(['after_or_equal:start_date'])
                                     ->reactive()
                                     ->afterStateUpdated(function (callable $set, $state, $get) {
-                                        $endDate = $get('end_date');
-                                        $endDateReal = $state;
+                                        $endDate = $state;
+                                        $endDateProjected = $get('end_date_projected');
 
-                                        if (!$endDate || !$endDateReal) {
+                                        if (!$endDate || !$endDateProjected) {
                                             $set('delay_days', 0);
                                             return;
                                         }
 
                                         $endDateObj = Carbon::parse($endDate);
-                                        $endDateRealObj = Carbon::parse($endDateReal);
+                                        $endDateProjectedObj = Carbon::parse($endDateProjected);
 
-                                        // Si la fecha real es anterior a la fecha proyectada, no hay desfase
-                                        if ($endDateRealObj->lte($endDateObj)) {
+                                        // Si la fecha proyectada es anterior a la fecha planificada, no hay desfase
+                                        if ($endDateProjectedObj->lte($endDateObj)) {
                                             $set('delay_days', 0);
                                             return;
                                         }
@@ -156,7 +154,7 @@ class ProjectResource extends Resource
                                         $delayDays = 0;
                                         $currentDate = clone $endDateObj;
 
-                                        while ($currentDate->lt($endDateRealObj)) {
+                                        while ($currentDate->lt($endDateProjectedObj)) {
                                             // Si no es sábado (6) ni domingo (0)
                                             if (!in_array($currentDate->dayOfWeek, [0, 6])) {
                                                 $delayDays++;
@@ -167,24 +165,73 @@ class ProjectResource extends Resource
                                         $set('delay_days', $delayDays);
                                     }),
 
+                                Forms\Components\DatePicker::make('end_date_projected')
+                                    ->label('Fecha de Finalización Proyectada')
+                                    ->native(false)
+                                    ->displayFormat('d/m/Y')
+                                    ->closeOnDateSelection()
+                                    ->afterOrEqual('start_date')
+                                    ->rules(['after_or_equal:start_date'])
+                                    ->reactive()
+                                    ->afterStateUpdated(function (callable $set, $state, $get) {
+                                        $endDate = $get('end_date');
+                                        $endDateProjected = $state;
+
+                                        if (!$endDate || !$endDateProjected) {
+                                            $set('delay_days', 0);
+                                            return;
+                                        }
+
+                                        $endDateObj = Carbon::parse($endDate);
+                                        $endDateProjectedObj = Carbon::parse($endDateProjected);
+
+                                        // Si la fecha proyectada es anterior a la fecha planificada, no hay desfase
+                                        if ($endDateProjectedObj->lte($endDateObj)) {
+                                            $set('delay_days', 0);
+                                            return;
+                                        }
+
+                                        // Calcular días laborables entre las dos fechas
+                                        $delayDays = 0;
+                                        $currentDate = clone $endDateObj;
+
+                                        while ($currentDate->lt($endDateProjectedObj)) {
+                                            // Si no es sábado (6) ni domingo (0)
+                                            if (!in_array($currentDate->dayOfWeek, [0, 6])) {
+                                                $delayDays++;
+                                            }
+                                            $currentDate->addDay();
+                                        }
+
+                                        $set('delay_days', $delayDays);
+                                    }),
+
+                                Forms\Components\DatePicker::make('end_date_real')
+                                    ->label('Fecha de Finalización Real')
+                                    ->native(false)
+                                    ->displayFormat('d/m/Y')
+                                    ->closeOnDateSelection()
+                                    ->afterOrEqual('start_date')
+                                    ->rules(['after_or_equal:start_date']),
+
                                 Forms\Components\TextInput::make('delay_days')
                                     ->label('Días de desfase')
-                                    ->helperText('Días laborables entre la fecha de finalización y la fecha de finalización real')
+                                    ->helperText('Días laborables entre la fecha de finalización planificada y la fecha de finalización proyectada')
                                     ->disabled()
                                     ->dehydrated(true) // Cambiado a true para que se guarde en la base de datos
                                     ->numeric()
                                     ->suffix(' días')
                                     ->afterStateHydrated(function (Forms\Components\TextInput $component, $state, $record) {
-                                        if (!$record || !$record->end_date || !$record->end_date_real) {
+                                        if (!$record || !$record->end_date || !$record->end_date_projected) {
                                             $component->state(0);
                                             return;
                                         }
 
                                         $endDateObj = Carbon::parse($record->end_date);
-                                        $endDateRealObj = Carbon::parse($record->end_date_real);
+                                        $endDateProjectedObj = Carbon::parse($record->end_date_projected);
 
-                                        // Si la fecha real es anterior a la fecha proyectada, no hay desfase
-                                        if ($endDateRealObj->lte($endDateObj)) {
+                                        // Si la fecha proyectada es anterior a la fecha planificada, no hay desfase
+                                        if ($endDateProjectedObj->lte($endDateObj)) {
                                             $component->state(0);
                                             return;
                                         }
@@ -193,7 +240,7 @@ class ProjectResource extends Resource
                                         $delayDays = 0;
                                         $currentDate = clone $endDateObj;
 
-                                        while ($currentDate->lt($endDateRealObj)) {
+                                        while ($currentDate->lt($endDateProjectedObj)) {
                                             // Si no es sábado (6) ni domingo (0)
                                             if (!in_array($currentDate->dayOfWeek, [0, 6])) {
                                                 $delayDays++;
@@ -381,6 +428,97 @@ class ProjectResource extends Resource
                             ->columnSpanFull(),
                     ]),
 
+                Forms\Components\Section::make('Hitos del Proyecto')
+                    ->description('Gestione los hitos del proyecto')
+                    ->collapsible()
+                    ->schema([
+                        Forms\Components\Repeater::make('milestones')
+                            ->relationship()
+                            ->label('Hitos')
+                            ->orderColumn('order')
+                            ->defaultItems(0)
+                            ->schema([
+                                Forms\Components\TextInput::make('name')
+                                    ->label('Nombre')
+                                    ->required()
+                                    ->maxLength(255)
+                                    ->placeholder('Ej: Hito 1 - Entrega de diseño'),
+
+                                Forms\Components\Grid::make(2)
+                                    ->schema([
+                                        Forms\Components\DatePicker::make('start_date')
+                                            ->label('Fecha de Inicio')
+                                            ->required()
+                                            ->native(false)
+                                            ->displayFormat('d/m/Y')
+                                            ->closeOnDateSelection(),
+
+                                        Forms\Components\DatePicker::make('end_date')
+                                            ->label('Fecha de Finalización')
+                                            ->required()
+                                            ->native(false)
+                                            ->displayFormat('d/m/Y')
+                                            ->closeOnDateSelection()
+                                            ->afterOrEqual('start_date')
+                                            ->rules(['after_or_equal:start_date']),
+                                    ]),
+
+                                Forms\Components\Grid::make(3)
+                                    ->schema([
+                                        Forms\Components\TextInput::make('billing_percentage')
+                                            ->label('Facturación (%)')
+                                            ->numeric()
+                                            ->minValue(0)
+                                            ->maxValue(100)
+                                            ->step(0.01)
+                                            ->suffix('%')
+                                            ->required(),
+
+                                        Forms\Components\Select::make('status')
+                                            ->label('Estado')
+                                            ->options([
+                                                'Pendiente' => 'Pendiente',
+                                                'En Progreso' => 'En Progreso',
+                                                'Completado' => 'Completado',
+                                                'Retrasado' => 'Retrasado',
+                                            ])
+                                            ->required()
+                                            ->default('Pendiente'),
+
+                                        Forms\Components\TextInput::make('total_hours')
+                                            ->label('Horas Registradas')
+                                            ->numeric()
+                                            ->disabled()
+                                            ->suffix(' h')
+                                            ->afterStateHydrated(function (Forms\Components\TextInput $component, $state, $record) {
+                                                if ($record) {
+                                                    $component->state($record->total_hours ?? 0);
+                                                } else {
+                                                    $component->state(0);
+                                                }
+                                            })
+                                            ->dehydrated(false),
+                                    ]),
+
+                                Forms\Components\Textarea::make('description')
+                                    ->label('Descripción')
+                                    ->rows(3)
+                                    ->maxLength(65535)
+                                    ->columnSpanFull(),
+                            ])
+                            ->columnSpanFull()
+                            ->itemLabel(fn (array $state): ?string => $state['name'] ?? null)
+                            ->reorderable()
+                            ->cloneable()
+                            ->collapsible()
+                            ->collapseAllAction(
+                                fn (Forms\Components\Actions\Action $action) => $action->label('Colapsar todos'),
+                            )
+                            ->expandAllAction(
+                                fn (Forms\Components\Actions\Action $action) => $action->label('Expandir todos'),
+                            ),
+                    ]),
+
                 Forms\Components\Section::make('Asignación de Usuarios')
                     ->description('Asignar usuarios al proyecto')
                     ->collapsible()
@@ -437,16 +575,21 @@ class ProjectResource extends Resource
                     ->label('Categoría')
                     ->sortable()
                     ->searchable(),
+                Tables\Columns\TextColumn::make('validity')
+                    ->label('Vigencia')
+                    ->sortable()
+                    ->searchable()
+                    ->visible(fn ($record): bool => $record && $record->category === 'BOLSA DE HORAS'),
                 Tables\Columns\TextColumn::make('state')
                     ->label('Estado')
                     ->sortable()
                     ->searchable()
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
-                        'Activo' => 'success',
-                        'Inactivo' => 'gray',
+                        'En Curso' => 'success',
+                        'En Garantia' => 'gray',
                         'Completado' => 'info',
-                        'Suspendido' => 'warning',
+                        'Bloqueado' => 'warning',
                         default => 'gray',
                     }),
                 Tables\Columns\TextColumn::make('phase')
@@ -505,15 +648,15 @@ class ProjectResource extends Resource
                     ->label('Días de desfase')
                     ->suffix(' días')
                     ->state(function (Project $record): int {
-                        if (!$record->end_date || !$record->end_date_real) {
+                        if (!$record->end_date || !$record->end_date_projected) {
                             return 0;
                         }
 
                         $endDateObj = Carbon::parse($record->end_date);
-                        $endDateRealObj = Carbon::parse($record->end_date_real);
+                        $endDateProjectedObj = Carbon::parse($record->end_date_projected);
 
-                        // Si la fecha real es anterior a la fecha proyectada, no hay desfase
-                        if ($endDateRealObj->lte($endDateObj)) {
+                        // Si la fecha proyectada es anterior a la fecha planificada, no hay desfase
+                        if ($endDateProjectedObj->lte($endDateObj)) {
                             return 0;
                         }
 
@@ -521,7 +664,7 @@ class ProjectResource extends Resource
                         $delayDays = 0;
                         $currentDate = clone $endDateObj;
 
-                        while ($currentDate->lt($endDateRealObj)) {
+                        while ($currentDate->lt($endDateProjectedObj)) {
                             // Si no es sábado (6) ni domingo (0)
                             if (!in_array($currentDate->dayOfWeek, [0, 6])) {
                                 $delayDays++;
