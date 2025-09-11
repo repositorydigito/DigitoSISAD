@@ -36,6 +36,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Usuarios
     Route::get('/users', [\App\Http\Controllers\Api\UserController::class, 'index']);
     Route::get('/users/statistics', [\App\Http\Controllers\Api\UserController::class, 'statistics']);
+    // Estadísticas de horas por usuario
+    Route::get('/users/time-statistics', [\App\Http\Controllers\Api\UserTimeEntryController::class, 'statistics']);
+    Route::get('/users/time-entries', [\App\Http\Controllers\Api\UserTimeEntryController::class, 'index']);
     Route::get('/users/{user}', [\App\Http\Controllers\Api\UserController::class, 'show']);
 
     // Entidades
@@ -52,7 +55,5 @@ Route::middleware('auth:sanctum')->group(function () {
     // Hitos de proyectos
     Route::apiResource('projects.milestones', \App\Http\Controllers\Api\ProjectMilestoneController::class);
 
-    // Estadísticas de horas por usuario
-    Route::get('/users/time-statistics', [\App\Http\Controllers\Api\UserTimeEntryController::class, 'statistics']);
-    Route::get('/users/time-entries', [\App\Http\Controllers\Api\UserTimeEntryController::class, 'index']);
+    
 });
