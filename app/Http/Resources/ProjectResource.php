@@ -65,6 +65,7 @@ class ProjectResource extends JsonResource
                         'end_date' => $milestone->end_date,
                         'billing_percentage' => $milestone->billing_percentage / 100,
                         'status' => $milestone->status,
+                        'is_paid' => (bool) $milestone->is_paid,
                         'order' => $milestone->order,
                         'total_hours' => (float) $totalHours,
                     ];

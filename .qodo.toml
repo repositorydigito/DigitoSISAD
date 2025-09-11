@@ -1,0 +1,135 @@
+# Qodo Configuration for DigitosisAD Laravel Project
+# This file configures Qodo for optimal code analysis and assistance
+
+[project]
+name = "digitosisad"
+description = "Laravel application with Filament admin panel for business management"
+language = "php"
+framework = "laravel"
+version = "11.x"
+
+[language]
+# PHP Configuration
+php_version = "8.2"
+composer_file = "composer.json"
+autoload_paths = ["app/", "database/", "tests/"]
+
+[framework]
+# Laravel specific settings
+type = "laravel"
+version = "11.x"
+app_path = "app/"
+config_path = "config/"
+routes_path = "routes/"
+views_path = "resources/views/"
+migrations_path = "database/migrations/"
+models_path = "app/Models/"
+controllers_path = "app/Http/Controllers/"
+
+[testing]
+# Testing framework configuration
+framework = "pest"
+test_directory = "tests/"
+feature_tests = "tests/Feature/"
+unit_tests = "tests/Unit/"
+phpunit_config = "phpunit.xml"
+
+[code_style]
+# Code style and quality tools
+psr_standard = "PSR-12"
+php_cs_fixer = false
+pint = true  # Laravel Pint is configured
+phpstan = true
+phpstan_config = "phpstan.neon"
+insights = true  # PHP Insights is configured
+
+[build]
+# Build and asset configuration
+frontend_framework = "vite"
+css_framework = "tailwindcss"
+package_manager = "npm"
+build_command = "npm run build"
+dev_command = "npm run dev"
+assets_path = "public/"
+
+[dependencies]
+# Key dependencies for context
+admin_panel = "filament"
+authentication = "sanctum"
+excel_handling = "maatwebsite/excel"
+permissions = "filament-shield"
+
+[directories]
+# Important directories for code analysis
+source = ["app/", "config/", "database/", "routes/"]
+tests = ["tests/"]
+resources = ["resources/"]
+public = ["public/"]
+storage = ["storage/app/"]
+
+# Exclude from analysis
+exclude = [
+    "vendor/",
+    "node_modules/",
+    "storage/logs/",
+    "storage/framework/",
+    "bootstrap/cache/",
+    ".git/"
+]
+
+[filament]
+# Filament specific configuration
+version = "3.x"
+resources_path = "app/Filament/Resources/"
+pages_path = "app/Filament/Pages/"
+widgets_path = "app/Filament/Widgets/"
+admin_panel = true
+shield_permissions = true
+
+[database]
+# Database configuration hints
+default_connection = "mysql"  # Assumed based on Laravel defaults
+migrations_path = "database/migrations/"
+seeders_path = "database/seeders/"
+factories_path = "database/factories/"
+
+[git]
+# Git configuration
+main_branch = "main"
+ignore_file = ".gitignore"
+
+[environment]
+# Environment configuration
+env_file = ".env"
+env_example = ".env.example"
+
+[scripts]
+# Common development scripts
+serve = "php artisan serve"
+migrate = "php artisan migrate"
+seed = "php artisan db:seed"
+test = "php artisan test"
+pint = "vendor/bin/pint"
+insights = "php artisan insights"
+stan = "vendor/bin/phpstan analyse"
+
+[ai_context]
+# Context for AI assistance
+project_type = "business_management_system"
+key_features = [
+    "user_management",
+    "financial_tracking", 
+    "project_management",
+    "time_tracking",
+    "equipment_management",
+    "reporting_dashboard"
+]
+tech_stack = [
+    "laravel_11",
+    "filament_3",
+    "php_8.2",
+    "mysql",
+    "tailwindcss",
+    "vite",
+    "pest_testing"
+]

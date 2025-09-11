@@ -88,6 +88,14 @@ class Project extends Model
     }
 
     /**
+     * Obtener los hitos de facturación del proyecto
+     */
+    public function billingMilestones(): HasMany
+    {
+        return $this->hasMany(BillingMilestone::class)->orderBy('order');
+    }
+
+    /**
      * Calcular los días de desfase entre la fecha de finalización planificada y la fecha de finalización proyectada
      *
      * @return int

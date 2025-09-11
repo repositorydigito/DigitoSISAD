@@ -20,54 +20,57 @@ class UserTimeEntryController extends Controller
     public function index(Request $request)
     {
         $query = User::query();
+
+        // Añadir el último registro de tiempo
+        $query->addSelect([
+            'last_time_entry' => \App\Models\TimeEntry::select('created_at')
+                ->whereColumn('user_id', 'users.id')
+                ->latest()
+                ->limit(1)
+        ]);
         
         // Filtrar por fechas si se proporcionan
         if ($request->has('start_date') && $request->has('end_date')) {
             $startDate = $request->input('start_date');
             $endDate = $request->input('end_date');
-            
-            // Añadir información de horas en el rango de fechas
-            $query->withCount(['timeEntries as total_hours_in_range' => function ($query) use ($startDate, $endDate) {
-                $query->whereBetween('date', [$startDate, $endDate])
-                      ->select(DB::raw('SUM(hours)'));
-            }]);
-            
+
+            // Siempre agregar horas totales en el rango (todos los proyectos)
+            $query->withSum(['timeEntries as total_hours_in_range' => function ($query) use ($startDate, $endDate) {
+                $query->whereBetween('date', [$startDate, $endDate]);
+            }], 'hours');
+
             // Filtrar por proyecto si se proporciona
             if ($request->has('project_id')) {
                 $projectId = $request->input('project_id');
-                
-                // Añadir información de horas en el proyecto y rango de fechas
-                $query->withCount(['timeEntries as total_hours_in_project_range' => function ($query) use ($startDate, $endDate, $projectId) {
+
+                // Añadir información de horas en el proyecto específico y rango de fechas
+                $query->withSum(['timeEntries' => function ($query) use ($startDate, $endDate, $projectId) {
                     $query->where('project_id', $projectId)
-                          ->whereBetween('date', [$startDate, $endDate])
-                          ->select(DB::raw('SUM(hours)'));
-                }]);
-                
+                          ->whereBetween('date', [$startDate, $endDate]);
+                }], 'hours');
+
                 // Solo incluir usuarios que tienen horas en este proyecto
                 $query->whereHas('timeEntries', function ($query) use ($projectId) {
                     $query->where('project_id', $projectId);
                 });
             }
         } else {
-            // Añadir información de horas totales
-            $query->withCount(['timeEntries as total_hours' => function ($query) {
-                $query->select(DB::raw('SUM(hours)'));
-            }]);
-            
             // Filtrar por proyecto si se proporciona
             if ($request->has('project_id')) {
                 $projectId = $request->input('project_id');
-                
-                // Añadir información de horas en el proyecto
-                $query->withCount(['timeEntries as total_hours_in_project' => function ($query) use ($projectId) {
-                    $query->where('project_id', $projectId)
-                          ->select(DB::raw('SUM(hours)'));
-                }]);
-                
+
+                // Añadir información de horas en el proyecto específico
+                $query->withSum(['timeEntries' => function ($query) use ($projectId) {
+                    $query->where('project_id', $projectId);
+                }], 'hours');
+
                 // Solo incluir usuarios que tienen horas en este proyecto
                 $query->whereHas('timeEntries', function ($query) use ($projectId) {
                     $query->where('project_id', $projectId);
                 });
+            } else {
+                // Añadir información de horas totales (todos los proyectos)
+                $query->withSum('timeEntries', 'hours');
             }
         }
         
@@ -77,7 +80,23 @@ class UserTimeEntryController extends Controller
         // Ordenar por nombre
         $query->orderBy('name');
         
-        return UserResource::collection($query->get());
+        $users = $query->get();
+
+        // Debug temporal: verificar qué atributos se están generando
+        if ($request->get('debug') == '1') {
+            $firstUser = $users->first();
+            return response()->json([
+                'debug' => true,
+                'request_params' => $request->all(),
+                'users_count' => $users->count(),
+                'first_user_attributes' => $firstUser ? array_keys($firstUser->getAttributes()) : [],
+                'first_user_data' => $firstUser ? $firstUser->getAttributes() : null,
+                'time_entries_sum_hours' => $firstUser ? $firstUser->time_entries_sum_hours : 'NOT_FOUND',
+                'total_hours_in_range_sum_hours' => $firstUser ? $firstUser->total_hours_in_range_sum_hours : 'NOT_FOUND',
+            ]);
+        }
+
+        return UserResource::collection($users);
     }
     
     /**

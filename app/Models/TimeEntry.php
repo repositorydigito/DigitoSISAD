@@ -16,7 +16,8 @@ class TimeEntry extends Model
         'milestone_id',
         'date',
         'phase',
-        'hours'
+        'hours',
+        'description'
     ];
 
     protected $casts = [

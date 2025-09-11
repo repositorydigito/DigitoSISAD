@@ -19,12 +19,23 @@ class ProjectController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Project::query()->with(['entity', 'businessLine', 'users', 'creator', 'modifier', 'milestones']);
-
         // Filtrar por fechas si se proporcionan
         if ($request->has('start_date') && $request->has('end_date')) {
             $startDate = $request->input('start_date');
             $endDate = $request->input('end_date');
+
+            $query = Project::query()->with([
+                'entity',
+                'businessLine',
+                'creator',
+                'modifier',
+                'milestones',
+                'users' => function ($userQuery) use ($startDate, $endDate) {
+                    $userQuery->withSum(['timeEntries' => function ($timeQuery) use ($startDate, $endDate) {
+                        $timeQuery->whereBetween('date', [$startDate, $endDate]);
+                    }], 'hours');
+                }
+            ]);
 
             // Añadir información de horas en el rango de fechas
             $query->withCount(['timeEntries as total_hours_in_range' => function ($query) use ($startDate, $endDate) {
@@ -32,6 +43,15 @@ class ProjectController extends Controller
                       ->select(\DB::raw('SUM(hours)'));
             }]);
         } else {
+            $query = Project::query()->with([
+                'entity',
+                'businessLine',
+                'creator',
+                'modifier',
+                'milestones',
+                'users'
+            ]);
+
             // Añadir información de horas totales
             $query->withCount(['timeEntries as total_hours' => function ($query) {
                 $query->select(\DB::raw('SUM(hours)'));
@@ -84,6 +104,15 @@ class ProjectController extends Controller
         $perPage = $request->input('per_page', 15);
         $projects = $query->paginate($perPage);
 
+        // Cargar horas específicas por proyecto para cada usuario
+        foreach ($projects as $project) {
+            $project->load(['users' => function ($userQuery) use ($project) {
+                $userQuery->withSum(['timeEntries' => function ($timeQuery) use ($project) {
+                    $timeQuery->where('project_id', $project->id);
+                }], 'hours');
+            }]);
+        }
+
         return ProjectResource::collection($projects);
     }
 
@@ -110,12 +139,11 @@ class ProjectController extends Controller
             }]);
 
             // Cargar usuarios con sus horas en el rango de fechas
-            $project->load(['users' => function ($query) use ($startDate, $endDate) {
-                $query->withCount(['timeEntries as total_hours_in_range' => function ($query) use ($startDate, $endDate) {
-                    $query->where('project_id', $project->id)
-                          ->whereBetween('date', [$startDate, $endDate])
-                          ->select(DB::raw('SUM(hours)'));
-                }]);
+            $project->load(['users' => function ($query) use ($project, $startDate, $endDate) {
+                $query->withSum(['timeEntries' => function ($subQuery) use ($project, $startDate, $endDate) {
+                    $subQuery->where('project_id', $project->id)
+                             ->whereBetween('date', [$startDate, $endDate]);
+                }], 'hours');
             }]);
 
             // Cargar hitos con sus horas en el rango de fechas
@@ -131,15 +159,19 @@ class ProjectController extends Controller
                 $query->select(DB::raw('SUM(hours)'));
             }]);
 
-            // Cargar usuarios con sus horas totales en este proyecto
-            $project->load(['users' => function ($query) use ($project) {
-                $query->withCount(['timeEntries as total_hours_in_project' => function ($query) use ($project) {
-                    $query->where('project_id', $project->id)
-                          ->select(DB::raw('SUM(hours)'));
-                }]);
-            }]);
-
-            $project->load($relations);
+            // Cargar todas las relaciones incluyendo usuarios con sus horas específicas del proyecto
+            $project->load([
+                'entity',
+                'businessLine',
+                'creator',
+                'modifier',
+                'milestones',
+                'users' => function ($query) use ($project) {
+                    $query->withSum(['timeEntries' => function ($subQuery) use ($project) {
+                        $subQuery->where('project_id', $project->id);
+                    }], 'hours');
+                }
+            ]);
         }
 
         return new ProjectResource($project);

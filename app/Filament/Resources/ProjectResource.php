@@ -444,7 +444,7 @@ class ProjectResource extends Resource
                                     ->maxLength(255)
                                     ->placeholder('Ej: Hito 1 - Entrega de diseño'),
 
-                                Forms\Components\Grid::make(2)
+                                Forms\Components\Grid::make(3)
                                     ->schema([
                                         Forms\Components\DatePicker::make('start_date')
                                             ->label('Fecha de Inicio')
@@ -461,6 +461,17 @@ class ProjectResource extends Resource
                                             ->closeOnDateSelection()
                                             ->afterOrEqual('start_date')
                                             ->rules(['after_or_equal:start_date']),
+                                        Forms\Components\TextInput::make('progress')
+                                            ->label('Progreso del Hito (%)')
+                                            ->numeric()
+                                            ->minValue(0)
+                                            ->maxValue(100)
+                                            ->step(0.01)
+                                            ->suffix('%')
+                                            ->placeholder('Ingrese el progreso del hito')
+                                            ->default(0)
+                                            ->dehydrateStateUsing(fn ($state) => $state ? $state / 100 : 0)
+                                            ->formatStateUsing(fn ($state) => $state ? $state * 100 : 0),
                                     ]),
 
                                 Forms\Components\Grid::make(3)
@@ -502,6 +513,129 @@ class ProjectResource extends Resource
 
                                 Forms\Components\Textarea::make('description')
                                     ->label('Descripción')
+                                    ->rows(3)
+                                    ->maxLength(65535)
+                                    ->columnSpanFull(),
+                            ])
+                            ->columnSpanFull()
+                            ->itemLabel(fn (array $state): ?string => $state['name'] ?? null)
+                            ->reorderable()
+                            ->cloneable()
+                            ->collapsible()
+                            ->collapseAllAction(
+                                fn (Forms\Components\Actions\Action $action) => $action->label('Colapsar todos'),
+                            )
+                            ->expandAllAction(
+                                fn (Forms\Components\Actions\Action $action) => $action->label('Expandir todos'),
+                            ),
+                    ]),
+
+                    Forms\Components\Section::make('Hitos de Facturación')
+                    ->description('Gestione los hitos de facturación')
+                    ->collapsible()
+                    ->schema([
+                        Forms\Components\Repeater::make('billing_milestones')
+                            ->relationship('billingMilestones')
+                            ->label('Hitos')
+                            ->orderColumn('order')
+                            ->defaultItems(0)
+                            ->schema([
+                                Forms\Components\TextInput::make('name')
+                                    ->label('Nombre')
+                                    ->required()
+                                    ->maxLength(255),
+
+                                Forms\Components\Grid::make(3)
+                                    ->schema([
+                                        Forms\Components\DatePicker::make('planned_date')
+                                            ->label('Fecha de Pago Planificada')
+                                            ->required()
+                                            ->native(false)
+                                            ->displayFormat('d/m/Y')
+                                            ->closeOnDateSelection()
+                                            ->reactive(),
+
+                                        Forms\Components\DatePicker::make('real_date')
+                                            ->label('Fecha de Pago Real')
+                                            ->native(false)
+                                            ->displayFormat('d/m/Y')
+                                            ->closeOnDateSelection()
+                                            ->reactive(),
+                 
+                                        Forms\Components\TextInput::make('progress')
+                                            ->label('Porcentaje del Hito (%)')
+                                            ->numeric()
+                                            ->minValue(0)
+                                            ->maxValue(100)
+                                            ->step(0.01)
+                                            ->suffix('%')
+                                            ->placeholder('Ingrese el porcentaje del hito')
+                                            ->default(0)
+                                            ->dehydrateStateUsing(fn ($state) => $state ? $state / 100 : 0)
+                                            ->formatStateUsing(fn ($state) => $state ? $state * 100 : 0),
+                                    ]),
+
+                                Forms\Components\Grid::make(2)
+                                    ->schema([
+                                        Forms\Components\TextInput::make('amount')
+                                            ->label('Monto ($)')
+                                            ->numeric(),
+
+                                            Forms\Components\Select::make('status')
+                                            ->label('Estado')
+                                            ->options([
+                                                'Pago con retraso' => 'Pago con retraso',
+                                                'Pago a tiempo' => 'Pago a tiempo',
+                                                'Futuro' => 'Futuro',
+                                                'Retrasado' => 'Retrasado',
+                                            ])
+                                            ->required()
+                                            ->reactive()
+                                            ->afterStateHydrated(function (\Filament\Forms\Set $set, $state, \Filament\Forms\Get $get) {
+                                                // Si ya hay estado guardado, no lo cambiamos automáticamente
+                                                if ($state) return;
+                                        
+                                                $plannedDate = $get('planned_date');
+                                                $realDate = $get('real_date');
+                                                $today = now()->startOfDay();
+                                        
+                                                if ($realDate) {
+                                                    if (\Carbon\Carbon::parse($realDate)->greaterThan(\Carbon\Carbon::parse($plannedDate))) {
+                                                        $set('status', 'Pago con retraso');
+                                                    } else {
+                                                        $set('status', 'Pago a tiempo');
+                                                    }
+                                                } elseif ($plannedDate) {
+                                                    if (\Carbon\Carbon::parse($plannedDate)->greaterThan($today)) {
+                                                        $set('status', 'Futuro');
+                                                    } else {
+                                                        $set('status', 'Retrasado');
+                                                    }
+                                                }
+                                            })
+                                            ->afterStateUpdated(function (\Filament\Forms\Set $set, \Filament\Forms\Get $get) {
+                                                $plannedDate = $get('planned_date');
+                                                $realDate = $get('real_date');
+                                                $today = now()->startOfDay();
+                                        
+                                                if ($realDate) {
+                                                    if (\Carbon\Carbon::parse($realDate)->greaterThan(\Carbon\Carbon::parse($plannedDate))) {
+                                                        $set('status', 'Pago con retraso');
+                                                    } else {
+                                                        $set('status', 'Pago a tiempo');
+                                                    }
+                                                } elseif ($plannedDate) {
+                                                    if (\Carbon\Carbon::parse($plannedDate)->greaterThan($today)) {
+                                                        $set('status', 'Futuro');
+                                                    } else {
+                                                        $set('status', 'Retrasado');
+                                                    }
+                                                }
+                                            }),
+                                    ]),
+
+                                Forms\Components\Textarea::make('comments')
+                                    ->label('Comentarios')
                                     ->rows(3)
                                     ->maxLength(65535)
                                     ->columnSpanFull(),
@@ -692,7 +826,28 @@ class ProjectResource extends Resource
                     ->searchable(),
             ])
             ->filters([
-                // Aquí puedes agregar filtros si es necesario
+                Tables\Filters\SelectFilter::make('business_line_id')
+                    ->label('Línea de Negocio')
+                    ->relationship('businessLine', 'name')
+                    ->searchable()
+                    ->preload(),
+                Tables\Filters\SelectFilter::make('category')
+                    ->label('Categoría')
+                    ->options([
+                        'PROYECTO' => 'PROYECTO',
+                        'BOLSA DE HORAS' => 'BOLSA DE HORAS',
+                        'ADENDA' => 'ADENDA',
+                        'FEE MENSUAL' => 'FEE MENSUAL',
+                    ]),
+                Tables\Filters\SelectFilter::make('state')
+                    ->label('Estado')
+                    ->options([
+                        'En Curso' => 'En Curso',
+                        'Completado' => 'Completado',
+                        'En Garantia' => 'En Garantia',
+                        'Bloqueado' => 'Bloqueado',
+                    ]),
+
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),

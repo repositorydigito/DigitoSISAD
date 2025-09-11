@@ -16,6 +16,8 @@ class ProjectMilestone extends Model
         'end_date',
         'billing_percentage',
         'status',
+        'progress',
+        'is_paid',
         'order',
     ];
 
@@ -23,6 +25,9 @@ class ProjectMilestone extends Model
         'start_date' => 'date',
         'end_date' => 'date',
         'billing_percentage' => 'decimal:2',
+        'progress' => 'decimal:2',
+        'is_paid' => 'boolean',
+        'order' => 'integer',
     ];
 
     /**
