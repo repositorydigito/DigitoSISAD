@@ -22,6 +22,7 @@ class TimeEntryResource extends JsonResource
             'date' => $this->date,
             'phase' => $this->phase,
             'hours' => (float) $this->hours,
+            'detail' => $this->detail,
             'description' => $this->description,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,

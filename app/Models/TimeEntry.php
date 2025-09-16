@@ -17,6 +17,7 @@ class TimeEntry extends Model
         'date',
         'phase',
         'hours',
+        'detail',
         'description'
     ];
 

@@ -54,6 +54,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Hitos de proyectos
     Route::apiResource('projects.milestones', \App\Http\Controllers\Api\ProjectMilestoneController::class);
-
-    
+    // Time Entries
+    Route::apiResource('time-entries', \App\Http\Controllers\Api\TimeEntryController::class);
+   
 });
